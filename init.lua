@@ -90,7 +90,6 @@ P.S. You can delete this when you're done too. It's your config now! :)
 vim.g.have_nerd_font = false
 vim.g.mapleader = ' '
 vim.g.maplocalleader = ' '
-vim.o.autochdir = true
 vim.o.breakindent = true
 vim.o.confirm = true
 vim.o.cursorline = true
@@ -106,6 +105,7 @@ vim.o.signcolumn = 'yes'
 vim.o.smartcase = true
 vim.o.splitbelow = true
 vim.o.splitright = true
+vim.o.startofline = true
 vim.o.timeoutlen = 300
 vim.o.undofile = true
 vim.o.updatetime = 250
@@ -145,6 +145,10 @@ vim.keymap.set('n', '<C-h>', '<C-w><C-h>', { desc = 'Move focus to the left wind
 vim.keymap.set('n', '<C-l>', '<C-w><C-l>', { desc = 'Move focus to the right window' })
 vim.keymap.set('n', '<C-j>', '<C-w><C-j>', { desc = 'Move focus to the lower window' })
 vim.keymap.set('n', '<C-k>', '<C-w><C-k>', { desc = 'Move focus to the upper window' })
+vim.keymap.set('t', '<C-h>', [[<C-\><C-n><C-w>h]], { desc = 'Move focus to the left window' })
+vim.keymap.set('t', '<C-l>', [[<C-\><C-n><C-w>l]], { desc = 'Move focus to the right window' })
+vim.keymap.set('t', '<C-j>', [[<C-\><C-n><C-w>j]], { desc = 'Move focus to the lower window' })
+vim.keymap.set('t', '<C-k>', [[<C-\><C-n><C-w>k]], { desc = 'Move focus to the upper window' })
 
 -- NOTE: Some terminals have colliding keymaps or are not able to send distinct keycodes
 -- vim.keymap.set("n", "<C-S-h>", "<C-w>H", { desc = "Move window to the left" })
@@ -570,6 +574,48 @@ require('lazy').setup({
               vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled { bufnr = event.buf })
             end, '[T]oggle Inlay [H]ints')
           end
+
+          if client and client.name == 'biome' then
+            local enc = client.offset_encoding or 'utf-16'
+
+            local function apply_biome(kind)
+              local rp = vim.lsp.util.make_range_params(0, enc)
+              local params = {
+                textDocument = { uri = vim.uri_from_bufnr(event.buf) },
+                range = rp.range,
+                context = { only = { kind }, diagnostics = {} },
+              }
+
+              params.context = { only = { kind }, diagnostics = {} }
+
+              local res = vim.lsp.buf_request_sync(event.buf, 'textDocument/codeAction', params, 300)
+
+              if not res then
+                return
+              end
+
+              for _, r in pairs(res) do
+                for _, action in ipairs(r.result or {}) do
+                  if action.edit then
+                    vim.lsp.util.apply_workspace_edit(action.edit, enc)
+                  end
+
+                  if action.command then
+                    vim.lsp.buf_request(event.buf, 'workspace/executeCommand', action.command, function() end)
+                  end
+                end
+              end
+            end
+
+            vim.api.nvim_create_autocmd('BufWritePre', {
+              buffer = event.buf,
+              callback = function()
+                apply_biome 'source.fixAll.biome'
+                apply_biome 'source.organizeImports.biome'
+                vim.lsp.buf.format { bufnr = event.buf, async = false, name = 'biome' }
+              end,
+            })
+          end
         end,
       })
 
@@ -644,6 +690,11 @@ require('lazy').setup({
               -- diagnostics = { disable = { 'missing-fields' } },
             },
           },
+        },
+
+        biome = {
+          root_dir = require('lspconfig.util').root_pattern('biome.json', 'biome.jsonc'),
+          single_file_support = false,
         },
       }
 
@@ -881,6 +932,7 @@ require('lazy').setup({
       ensure_installed = { 'bash', 'c', 'diff', 'html', 'lua', 'luadoc', 'markdown', 'markdown_inline', 'query', 'vim', 'vimdoc' },
       -- Autoinstall languages that are not installed
       auto_install = true,
+      autotag = { enable = true },
       highlight = {
         enable = true,
         -- Some languages depend on vim's regex highlighting system (such as Ruby) for indent rules.
@@ -907,12 +959,12 @@ require('lazy').setup({
   --  Here are some example plugins that I've included in the Kickstart repository.
   --  Uncomment any of the lines below to enable them (you will need to restart nvim).
   --
-  -- require 'kickstart.plugins.debug',
-  -- require 'kickstart.plugins.indent_line',
-  -- require 'kickstart.plugins.lint',
-  -- require 'kickstart.plugins.autopairs',
-  -- require 'kickstart.plugins.neo-tree',
-  -- require 'kickstart.plugins.gitsigns', -- adds gitsigns recommend keymaps
+  require 'kickstart.plugins.debug',
+  require 'kickstart.plugins.indent_line',
+  require 'kickstart.plugins.lint',
+  require 'kickstart.plugins.autopairs',
+  require 'kickstart.plugins.neo-tree',
+  require 'kickstart.plugins.gitsigns', -- adds gitsigns recommend keymaps
 
   -- NOTE: The import below can automatically add your own plugins, configuration, etc from `lua/custom/plugins/*.lua`
   --    This is the easiest way to modularize your config.
