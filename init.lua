@@ -574,48 +574,6 @@ require('lazy').setup({
               vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled { bufnr = event.buf })
             end, '[T]oggle Inlay [H]ints')
           end
-
-          if client and client.name == 'biome' then
-            local enc = client.offset_encoding or 'utf-16'
-
-            local function apply_biome(kind)
-              local rp = vim.lsp.util.make_range_params(0, enc)
-              local params = {
-                textDocument = { uri = vim.uri_from_bufnr(event.buf) },
-                range = rp.range,
-                context = { only = { kind }, diagnostics = {} },
-              }
-
-              params.context = { only = { kind }, diagnostics = {} }
-
-              local res = vim.lsp.buf_request_sync(event.buf, 'textDocument/codeAction', params, 300)
-
-              if not res then
-                return
-              end
-
-              for _, r in pairs(res) do
-                for _, action in ipairs(r.result or {}) do
-                  if action.edit then
-                    vim.lsp.util.apply_workspace_edit(action.edit, enc)
-                  end
-
-                  if action.command then
-                    vim.lsp.buf_request(event.buf, 'workspace/executeCommand', action.command, function() end)
-                  end
-                end
-              end
-            end
-
-            vim.api.nvim_create_autocmd('BufWritePre', {
-              buffer = event.buf,
-              callback = function()
-                apply_biome 'source.fixAll.biome'
-                apply_biome 'source.organizeImports.biome'
-                vim.lsp.buf.format { bufnr = event.buf, async = false, name = 'biome' }
-              end,
-            })
-          end
         end,
       })
 
@@ -766,11 +724,10 @@ require('lazy').setup({
       end,
       formatters_by_ft = {
         lua = { 'stylua' },
-        -- Conform can also run multiple formatters sequentially
-        -- python = { "isort", "black" },
-        --
-        -- You can use 'stop_after_first' to run the first available formatter from the list
-        -- javascript = { "prettierd", "prettier", stop_after_first = true },
+        javascript = { 'biome', 'biome-organize-imports' },
+        javascriptreact = { 'biome', 'biome-organize-imports' },
+        typescript = { 'biome', 'biome-organize-imports' },
+        typescriptreact = { 'biome', 'biome-organize-imports' },
       },
     },
   },
