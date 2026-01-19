@@ -1,8 +1,5 @@
 require('lazy').setup({
-  {
-    'NMAC427/guess-indent.nvim',
-    opts = {},
-  },
+  require 'kickstart.plugins.guess-indent',
   require 'kickstart.plugins.gitsigns',
   require 'kickstart.plugins.which-key',
   require 'kickstart.plugins.telescope',
